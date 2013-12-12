@@ -8,6 +8,8 @@ from itertools import combinations, permutations
 import nltk,random
 import matplotlib.pyplot as plt
 import StringIO,Image
+from matplotlib.font_manager import FontProperties
+import pandas as pd
 
 data_folder="../data/"
 
@@ -164,7 +166,8 @@ def create_colormap():
 
 def create_plots(types=['Paddy','Basmati','Coarse'],year=2010):
     #Create visualization given a year. For creating visualization, the filters are going to be on the type of rice and the year. 
-
+    fontp=FontProperties()
+    fontp.set_size('small')
     con=sqlite3.connect('rice.db')
     c=con.cursor()
     colormap=create_colormap()
@@ -174,10 +177,15 @@ def create_plots(types=['Paddy','Basmati','Coarse'],year=2010):
     if(len(types)==1):
         rows=1
         columns=1
+    elif(len(types)%2==1):
+        columns=2
+        rows=len(types)/2+1
     else:
         columns=len(types)/2
         rows=2
+
     fig=plt.figure()
+
     for i in range(len(types)):
         fig.add_subplot(rows,columns,i)
     axes=[]
@@ -185,40 +193,88 @@ def create_plots(types=['Paddy','Basmati','Coarse'],year=2010):
         ax.grid(True)
         axes.append(ax)
         #print ax
-
+    
     #Getting the data from the tables
     i=0
+    #months=[0,31,29,31,30,31,30,30,31,30,31,30,31]
+    #monthsl=[0,31,28,31,30,31,30,30,31,30,31,30,31]
     for cat in types:
-        stprice={}
-        rows=c.execute("select State,Pday,AVG(MinPrice) from prices where Pyear=? and Category=? group by Pday,State",(year,cat))
-        for row in rows:
-            state=str(row[0])
-            day=str(row[1])
-            price=float(str(row[2]))
-            try:
-                stprice[state][0].append(day)
-                stprice[state][1].append(price)
-            except:
-                stprice[state]=[]
-                stprice[state].append([day])
-                stprice[state].append([price])
-        #print stprice
-        labels=[]
-        for k,v in stprice.items():
-            v[0]=sorted(v[0])
-            axes[i].plot(v[0],v[1],"^", color=colormap[k],label="state rice prices")
-            labels.append(k)
-        #axes[i].legend(tuple(labels),loc="lower right")
-        axes[i].set_title(cat+" in the year "+year)
-        i+=1
+        stprice={}  
+        '''months=pd.Series(months)
+        prices=pd.Series(prices)'''
+        #rows=c.execute("select State,Pday,PMonth,AVG(MinPrice) from prices where Pyear=? and Category=? and state=\"Karnataka\" group by Pday,PMonth,state ORDER BY PMonth,Pday",(year,cat))
+        rows=c.execute("select State,PMonth,AVG(MinPrice) from prices where Pyear=? and Category=? group by PMonth,state ORDER BY PMonth",(year,cat))
+        #print "select State,Pday,PMonth,AVG(MinPrice) from prices where Pyear="+year+" and Category="+cat+" group by Pday,PMonth,State" 
+        check=rows.fetchone()
+        #print check
+        if check is not None:
+            for row in rows:
+                state=str(row[0])
+                #day=str(row[1])
+                month=int(str(row[1]))
+                price=float(str(row[2]))
+                '''temp=0
+                if(int(year)%4==0):
+                    for m in monthsl[1:month-1]:
+                        temp+=m
+                    day=int(day)+temp
+                else:
+                    for m in months[1:month-1]:
+                        temp+=m
+                    day=int(day)+temp
+                price=float(str(row[3]))
+                if day==1:
+                    print row'''
+                try:
+                    stprice[state].append((month,price))
+                    #stprice[state][1].append(price)
+                except:
+                    stprice[state]=[(month,price)]
+                    #stprice[state].append([month])
+                    #stprice[state].append([price])
+                    
+                '''months.append(month)
+                prices.append(price)'''
+
+            
+            #stprices=pd.DataFrame({'months':months,'prices':prices})
+            #stprices['months']=months
+            #stprices['prices']=prices
+            #print stprice
+            labels=[]
+            for k,v in stprice.items():
+                #print k,v
+                #print "\n"
+                v=sorted(v)
+                #print v
+                months=[m[0] for m in v]
+                prices=[p[1] for p in v]
+                axes[i].plot(months,prices,color=colormap[k],label="state rice prices")
+                labels.append(k)
+            #axes[i].legend(tuple(labels),loc="lower right")
+            axes[i].set_title(cat+" in the year "+year)
+            if(i==0 or i==1):
+                cols=3
+            else:
+                cols=4
+            #axes[i].set_xlabel("Months")
+            axes[i].legend(tuple(labels),loc="upper center",bbox_to_anchor=(0.5,-0.1),prop=fontp,fancybox=True, shadow=True, ncol=cols)
+            i+=1
+        else:
+            print "Deleting axis",i
+            #fig.delaxes(axes[i])
     con.close()
-    plt.subplots_adjust(hspace=0.5)
-    plt.legend(tuple(labels),loc="upper left")
+    plt.subplots_adjust(hspace=0.9,wspace=0.2,left=0.15)
+    plt.xlabel('Months',fontsize=16,va="top",ha="center")
+    plt.ylabel('Price',fontsize=16,ha="left")
+    #plt.legend(tuple(labels),loc="center left",bbox_to_anchor=(1, 0.5),prop=fontp)
+
     #plt.show()
     '''imgdata=StringIO.StringIO()
     fig.save(imgdata,format='png')
     imgdata.seek(0)'''
     imgpath="./static/images/graph.png"
+    #fig.set_size_inches(12,6)
     fig.savefig(imgpath)
     return imgpath
 
