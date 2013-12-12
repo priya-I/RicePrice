@@ -2,13 +2,9 @@ import os
 from flask import Flask, request, render_template, redirect, url_for, flash, Blueprint,make_response,session
 import sqlite3
 import traceback
-from werkzeug import secure_filename
 import csv 
 import predict as p
 
-
-
-ALLOWED_EXTENSIONS=set(['csv'])
 current_dir=os.getcwd()
 STATIC_FOLDER=current_dir+'/static/images/'
 TEMPLATE_DIR=current_dir+'/templates/'
@@ -17,30 +13,33 @@ app.config['static_folder']=STATIC_FOLDER
 app.config['template_folder']=TEMPLATE_DIR
 app.config.from_object(__name__)
 
-
 @app.route('/')
 def main():
+    '''
+    Method called to render the landing page
+    '''
     return render_template("prices.html")
 
 @app.route('/plot',methods=["POST","GET"])
 def plot():
+    '''
+    Main method that plots the charts based on the input parameters
+    '''
     if request.method == "POST" and request.form is not None:
         types=[]
+        #Get the parameters passed on from the request form
         options=request.form
         for k,v in options.items():
+            #Extract the year parameter from the page
             if(k=='year'):
                 year=v
             else:
+                #Extract the categories from the input checkboxes
                 types.append(k)
-        print types,year
+        #Calling the method that creates charts based on types of rice and year
         imgpath=p.create_plots(types,year)
-        #im=Image.open(imgdata)
-        #imgpath="."+imgpath
-        print imgpath
     return render_template("prices.html",imgpath=imgpath)
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.',1)[1] in ALLOWED_EXTENSIONS
 
 @app.after_request
 def add_header(response):
